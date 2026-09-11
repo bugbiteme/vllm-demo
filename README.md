@@ -35,13 +35,13 @@ IBM's Granite models on Hugging Face are released under Apache 2.0 and are not g
 1. Create a namespace for the deployment
 
 ```bash
-kubectl create namespace raiis-demo 
+kubectl create namespace rhaiis-demo 
 ```
 
 2. Deploy vLLM to namespace (deployment and service)
 
 ```bash
-kubectl apply -f k8s/vllm/deployment.yaml -n raiis-demo   
+kubectl apply -f k8s/vllm/deployment.yaml -n rhaiis-demo   
 ```
 
 Output:
@@ -53,7 +53,7 @@ service/rhaiis-granite created
 Quick sanity check to confirm it actually serves a request:
 
 ```bash
-kubectl port-forward svc/rhaiis-granite 8000:8000 -n raiis-demo
+kubectl port-forward svc/rhaiis-granite 8000:8000 -n rhaiis-demo
 ```
 
 then in another terminal:
@@ -95,3 +95,29 @@ Sample output:
   "kv_transfer_params": null
 }
 ```
+
+## Persistant storage layer for your models
+
+You may have noticed that it took some time for vllm to get up and running. 
+Not only did k8 pull the container image for vLLM, but also the model from hugging face, and these can be quite large.
+
+Every time we redeploy, or roll out a new pod we would have to wait for these each time, so lets add a PVC to store the model, so subsequent
+redeployments take less time.
+
+```bash
+kubectl apply -f k8s/vllm/deployment-w-storage.yaml -n rhaiis-demo 
+```
+Output
+```bash
+persistentvolumeclaim/rhaiis-cache created
+deployment.apps/rhaiis-granite configured
+service/rhaiis-granite unchanged
+```
+
+3-5+ minutes the first time, but if you do a rollout/restart:
+
+```bash
+kubectl rollout restart deployment -n rhaiis-demo 
+```
+ you will see the redployment time drop significatly (90 seconds in my test environment)
+
