@@ -178,4 +178,6 @@ curl -k https://$GATEWAY/v1/chat/completions \
   -d '{"model": "ibm-granite/granite-4.2-8b", "messages": [{"role": "user", "content": "Hello"}]}' | jq
   ```
 
+Try will a different/invalide value of `x-model-name` to get a 404 error
+
 Note: TLS and DNS can be automated with other tools, such as the upstream project `kuadrant` or `Red Hat Connectivity Link`
