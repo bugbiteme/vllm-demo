@@ -181,3 +181,8 @@ curl -k https://$GATEWAY/v1/chat/completions \
 Try will a different/invalide value of `x-model-name` to get a 404 error
 
 Note: TLS and DNS can be automated with other tools, such as the upstream project `kuadrant` or `Red Hat Connectivity Link`
+
+TODO: 
+- Performance tuning
+- OGX (formerly Llama Stack)
+- RAG integration
