@@ -161,8 +161,8 @@ Gateway API is becoming the new standard for ingress on k8s. You may be using so
 that is fine.
 
 Gateway API is also a great way to provide Model-as-a-Service (MaaaS), since you can run multiple
-inferences servers, and use routing rules (such as path or header evaluation) to send traffic to
-different models (in differnt namespaces if needed) with a common entry point.
+inferences servers in your cluster, and use routing rules (such as path or header evaluation) to 
+send traffic to different models (in differnt namespaces if needed) with a common entry point.
 
 1. Create a namespace for the gateway
 
@@ -228,3 +228,5 @@ TODO:
 - RAG integration
 - llm-d
 - multi model
+- Auth tokens
+- Token quotas
