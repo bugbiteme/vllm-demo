@@ -186,3 +186,5 @@ TODO:
 - Performance tuning
 - OGX (formerly Llama Stack)
 - RAG integration
+- llm-d
+- multi model
