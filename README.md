@@ -121,3 +121,61 @@ kubectl rollout restart deployment -n rhaiis-demo
 ```
  you will see the redployment time drop significatly (90 seconds in my test environment)
 
+## Adding Ingress via Gateway API
+
+Gateway API is becoming the new standard for ingress on k8s. You may be using something else, and that is fine.
+
+Gateway API is also a great way to provide Model-as-a-Service (MaaaS), since you can run multiple inferences servers, and use
+routing rules (such as path or header evaluation) to send traffic to different models (in differnt namespaces if needed) with a common entry point.
+
+1. Create a namespace for the gateway
+
+```bash
+kubectl create namespace maas-gateway 
+```
+
+2. TLS for the Gateway
+
+The `maas-gateway` Gateway terminates HTTPS, which means it needs a TLS certificate before its listener will accept any traffic. We use are using cert-manager's **self-signed Issuer** to generate one:
+
+```bash
+kubectl apply -f k8s/ingress/certs.yaml -n maas-gateway  
+```
+
+output
+```
+issuer.cert-manager.io/maas-gateway-selfsigned created
+certificate.cert-manager.io/maas-gateway-tls created
+```
+
+3. Create the Gateway
+
+```bash
+kubectl apply -f k8s/ingress/gateway.yaml -n maas-gateway
+```
+
+Once applied, get the Gateway's external address with:
+```bash
+kubectl get gateway maas-gateway -n maas-gateway -o jsonpath='{.status.addresses[0].value}'
+```
+
+4. Create an HTTPRoute with header based routing rules, in case we want to add more vllm servers and provide access through the gateway
+
+```bash
+kubectl apply -f k8s/vllm/httproute.yaml -n rhaiis-demo  
+```
+
+Test access to the model
+
+```bash
+GATEWAY=$(kubectl get gateway maas-gateway -n maas-gateway -o jsonpath='{.status.addresses[0].value}')\
+
+echo https://$GATEWAY/v1/chat/completions
+
+curl -k https://$GATEWAY/v1/chat/completions \
+  -H "x-model-name: granite-4.2-8b" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "ibm-granite/granite-4.2-8b", "messages": [{"role": "user", "content": "Hello"}]}' | jq
+  ```
+
+Note: TLS and DNS can be automated with other tools, such as the upstream project `kuadrant` or `Red Hat Connectivity Link`

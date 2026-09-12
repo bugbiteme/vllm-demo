@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: maas-gateway-selfsigned
+  namespace: maas-gateway
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: maas-gateway-tls
+  namespace: maas-gateway
+spec:
+  secretName: maas-gateway-tls
+  dnsNames:
+    - maas-gateway.yourdomain.com
+  issuerRef:
+    name: maas-gateway-selfsigned
+    kind: Issuer
