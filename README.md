@@ -1,15 +1,26 @@
-# vLLM on Kubernetes via Red Hat AI Inference Server (RHAIIS)
+# vLLM Demo
+
+ - Tested on Kubernetes Version: v1.33.13
+ - Single node cluster
+ - 4 x NVIDIA L4
+ - vLLM: `registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.0`
+ - Model: `ibm-granite/granite-4.2-8b`
+
+This repo is intended to be a tutorial on how to run vLLM in Kubernetes powered by NVIDA accelerators. 
+It includes a number of iterative steps that build on eachother.
+
+1. Accelerator lookup - How to look GPU type in your cluster
+2. Basic deployment of vLLM in k8s - Minimal deployment
+3. Adding a model cache layer for faster (re)deployments - Storing a model from Hugging Face in a persistant storage layer
+4. Adding ingress - Adding ingress via Gateway API with routing rules to different models (for future MaaS functionalit)
+5. More being developed (see `TODO` at the bottom) - Performance Tuning, OGX, RAG, llm-d, Governance, etc...
+
+## vLLM on Kubernetes via Red Hat AI Inference Server (RHAIIS)
 
  Red Hat AI Inference provides enterprise-grade stability and security for serving large language 
  models across hybrid cloud and edge environments. Built on the open source vLLM project, AI 
  Inference delivers optimized standalone inference and Kubernetes-native distributed inference to 
  meet the demands of production AI workloads. 
-
- - Tested on Kubernetes Version: v1.33.13
- - Single node cluster
- - 4 x NVIDIA L4
- - RHAIIS: `registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.0`
- - Model: `ibm-granite/granite-4.2-8b`
 
 ## Prerequisites
 
