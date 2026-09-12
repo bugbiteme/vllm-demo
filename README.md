@@ -17,10 +17,10 @@ It includes a number of iterative steps that build on eachother.
 
 ## vLLM on Kubernetes via Red Hat AI Inference Server (RHAIIS)
 
- Red Hat AI Inference provides enterprise-grade stability and security for serving large language 
- models across hybrid cloud and edge environments. Built on the open source vLLM project, AI 
- Inference delivers optimized standalone inference and Kubernetes-native distributed inference to 
- meet the demands of production AI workloads. 
+ This demo is using Red Hat AI Inference Server (RHAIIS). RHAIIS provides enterprise-grade stability and security for serving 
+ large language models across hybrid cloud and edge environments. Built on the open source vLLM project, AI 
+ Inference delivers optimized standalone inference and Kubernetes-native distributed inference to meet the demands of 
+ production AI workloads. 
 
 ## Prerequisites
 
