@@ -2,8 +2,10 @@
 
  - Tested on Kubernetes Version: v1.33.13
  - Single node cluster
- - 4 x NVIDIA L4
- - vLLM: `registry.redhat.io/rhaiis/vllm-cuda-rhel9:3.2.0`
+ - 4 and 1 x NVIDIA L4
+   - (`g6.8xlarge` = single L4)
+   - (`g6.12xlarge` = four L4)
+ - vLLM: `registry.redhat.io/rhaii/vllm-cuda-rhel9:3.5.1`
  - Model: `ibm-granite/granite-4.2-8b`
 
 This repo is intended to be a tutorial on how to run vLLM in Kubernetes powered by NVIDA accelerators. 
@@ -12,7 +14,7 @@ It includes a number of iterative steps that build on eachother.
 1. Accelerator lookup - How to look GPU type in your cluster
 2. Basic deployment of vLLM in k8s - Minimal deployment
 3. Adding a model cache layer for faster (re)deployments - Storing a model from Hugging Face in a persistant storage layer
-4. Adding ingress - Adding ingress via Gateway API with routing rules to different models (for future MaaS functionalit)
+4. Adding ingress - Adding ingress via Gateway API with routing rules to different models (for future MaaS functionality)
 5. More being developed (see `TODO` at the bottom) - Performance Tuning, OGX, RAG, llm-d, Governance, etc...
 
 ## vLLM on Kubernetes via Red Hat AI Inference Server (RHAIIS)
@@ -44,6 +46,8 @@ IBM Granite models can be found at:
 
 IBM's Granite models on Hugging Face are released under Apache 2.0 and are not gated, so you don't 
 need a token/login just to download them. You can pull them anonymously.
+
+Set a `HF_TOKEN` to enable higher rate limits and faster downloads.
 
 ## Simple deployment of vLLM on Kubernetes
 
@@ -226,7 +230,7 @@ curl -k https://$GATEWAY/v1/chat/completions \
   -H "x-model-name: granite-4.2-8b" \
   -H "Content-Type: application/json" \
   -d '{"model": "ibm-granite/granite-4.2-8b", "messages": [{"role": "user", "content": "Hello"}]}' | jq
-  ```
+```
 
 Try will a different/invalide value of `x-model-name` to get a 404 error
 
