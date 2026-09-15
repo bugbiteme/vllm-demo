@@ -519,9 +519,171 @@ then open `http://localhost:8080` — first launch prompts you to create an admi
 
 Now you can chat with the hosted model, rather than running a series of `curl` commands
 
+## RAG
+RAG is a way to augment a models knowlege without needing to actually train the model. Data is encoded (embedded) to a vector database that the model can pull from.
+
+Scenario: We are now a healtcare provider, and need to have our model be able to provide relevant information to patients, doctors, and insurance processers.
+
+As of now, the only data our granite model contains is minimal (8 billion parameters), and only contains general knowledge.
+
+The directory `rag-data` contains **synthetic, fictional documents** created to test a Retrieval-Augmented Generation (RAG) pipeline against a healthcare-provider-and-insurer use case (claims validation, member benefits, clinical policy lookup, provider operations).
+
+**Everything here is made up.** "Meridian Health Partners" is not a real company. All member names, IDs, phone numbers, addresses, provider names, NPIs, and case scenarios are fabricated for testing purposes only. Do not treat any figure, policy detail, or clinical criterion here as real-world guidance — this exists purely to give a RAG pipeline realistic-looking documents to chunk, embed, and retrieve against.
+
+We will wire these into OGX's RAG/vector_io setup
+
+```bash
+GATEWAY=$(kubectl get gateway maas-gateway -n maas-gateway -o jsonpath='{.status.addresses[0].value}')
+
+# Step 1 — create vector store, capture its ID
+VECTOR_STORE_ID=$(curl -sk -X POST https://$GATEWAY/v1/vector_stores \
+  -H "Content-Type: application/json" \
+  -d '{"name": "meridian-health-docs"}' | jq -r '.id')
+echo "Vector store: $VECTOR_STORE_ID"
+
+# Step 2 — upload each document, capture each file ID into an array
+FILE_IDS=()
+for f in rag-data/plan-benefits-summary.md \
+         rag-data/claims-submission-policy.md \
+         rag-data/prior-authorization-requirements.md \
+         rag-data/medical-necessity-criteria-imaging.md \
+         rag-data/claim-denial-reason-codes.md \
+         rag-data/member-appeals-grievance-process.md \
+         rag-data/provider-network-directory.md \
+         rag-data/prescription-drug-formulary.md \
+         rag-data/care-management-programs.md \
+         rag-data/member-eligibility-verification.md; do
+  FILE_ID=$(curl -sk -X POST https://$GATEWAY/v1/files \
+    -F "file=@${f}" \
+    -F "purpose=assistants" | jq -r '.id')
+  echo "Uploaded $f -> $FILE_ID"
+  FILE_IDS+=("$FILE_ID")
+done
+
+# Step 3 — attach all uploaded files to the vector store in one batch
+FILE_IDS_JSON=$(printf '%s\n' "${FILE_IDS[@]}" | jq -R . | jq -s .)
+curl -sk -X POST https://$GATEWAY/v1/vector_stores/$VECTOR_STORE_ID/file_batches \
+  -H "Content-Type: application/json" \
+  -d "{\"file_ids\": $FILE_IDS_JSON}"
+
+# Step 4 — test retrieval directly
+curl -sk -X POST https://$GATEWAY/v1/vector_stores/$VECTOR_STORE_ID/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Is an MRI of the lumbar spine covered without prior authorization?"}' | jq
+
+# Step 5 — full RAG flow through the model
+QUESTION="Is an MRI of the lumbar spine covered without prior authorization?"
+
+# Step 5.1: retrieve relevant chunks
+CONTEXT=$(curl -sk -X POST https://$GATEWAY/v1/vector_stores/$VECTOR_STORE_ID/search \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --arg q "$QUESTION" '{query: $q, max_num_results: 5}')" \
+  | jq -r '[.data[].content[].text] | join("\n\n---\n\n")')
+
+# Step 5.2: ask the model with retrieved context injected
+curl -sk -X POST https://$GATEWAY/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --arg ctx "$CONTEXT" --arg q "$QUESTION" '{
+    model: "vllm/ibm-granite/granite-4.2-8b-fp8",
+    max_tokens: 1024,
+    messages: [
+      {role: "system", content: "Answer using only the provided context. If the context does not contain the answer, say so."},
+      {role: "user", content: ("Context:\n\n" + $ctx + "\n\nQuestion: " + $q)}
+    ]
+  }')" | jq
+```
+
+### Open WebUI Integration, via a custom Filter function
+
+go to 
+```
+http://localhost:8080/admin/functions
+```
+
+and click the `Create` button in the upper left hand side
+
+Replace the example code with the following:
+
+```python
+"""
+title: Meridian RAG Retriever
+author: you
+author_url: https://github.com/your-org
+funding_url: https://github.com/your-org
+version: 0.1
+"""
+
+from pydantic import BaseModel, Field
+from typing import Optional
+import requests
+
+
+class Filter:
+    class Valves(BaseModel):
+        ogx_base_url: str = Field(
+            default="http://ogx-svc:8321", description="OGX internal service URL"
+        )
+        vector_store_id: str = Field(
+            default="", description="OGX vector store ID to search against"
+        )
+        max_results: int = Field(
+            default=5, description="Number of chunks to retrieve"
+        )
+        pass
+
+    def __init__(self):
+        self.valves = self.Valves()
+        pass
+
+    def inlet(self, body: dict, __user__: Optional[dict] = None) -> dict:
+        messages = body.get("messages", [])
+        if not messages or messages[-1].get("role") != "user":
+            return body
+        if not self.valves.vector_store_id:
+            return body
+
+        query = messages[-1]["content"]
+
+        try:
+            resp = requests.post(
+                f"{self.valves.ogx_base_url}/v1/vector_stores/{self.valves.vector_store_id}/search",
+                json={"query": query, "max_num_results": self.valves.max_results},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            results = resp.json().get("data", [])
+            chunks = [c["text"] for r in results for c in r.get("content", [])]
+            context = "\n\n---\n\n".join(chunks)
+        except Exception as e:
+            context = f"[RAG retrieval failed: {e}]"
+
+        messages[-1]["content"] = (
+            f"Context:\n\n{context}\n\nQuestion: {query}\n\n"
+            "Answer using only the provided context. If the context does not contain the answer, say so."
+        )
+        body["messages"] = messages
+        return body
+```
+
+once saved, click the gear icon to set the `Vector Store Id`
+
+```bash
+curl -sk https://$GATEWAY/v1/vector_stores | jq '.data[] | {id, name}'
+```
+After saving
+- Enable it using the toggle in the upper right corner.
+- Click on the model on the left menu panel to start a new session
+- Edit the model settings
+- Enable the Filters - `Meridian RAG Retriever`
+
+Now ask in the chat: "Is an MRI of the lumbar spine covered without prior authorization?"
+
+Your answer should only reference the data we provided to the vector DB running in OGX.
+
+Note tha additional tweaks, such as disabling web search for the model may need to be tweaked to get the desired results.
+
 TODO: 
 
-- RAG integration
 - tool calling agent
 - multi model
 - Auth tokens

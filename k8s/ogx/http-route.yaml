@@ -22,3 +22,24 @@ spec:
       backendRefs:
         - name: ogx-svc
           port: 8321
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/vector_stores
+      backendRefs:
+        - name: ogx-svc
+          port: 8321
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/files
+      backendRefs:
+        - name: ogx-svc
+          port: 8321
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/responses
+      backendRefs:
+        - name: ogx-svc
+          port: 8321
