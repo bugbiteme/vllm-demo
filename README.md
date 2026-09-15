@@ -454,8 +454,15 @@ curl -k https://$GATEWAY/v1/chat/completions \
   -d '{"model": "vllm/ibm-granite/granite-4.2-8b-fp8", "messages": [{"role": "user", "content": "Hello"}]}' | jq
 ```
 
+
 Note: we removed the routing header, and are now only relying on the specified model in the payload data. 
 we also added the `vllm/` prefix to the model specification, which is how OGX is routing to our running model.
+
+Once you validate functionality, you may now safely delete the `HTTPRoute` we created directly for vLLM.
+
+```bash
+kubectl delete httproute rhaiis-granite -n rhaiis-demo 
+```
 
 For this demo we have one model server (`vllm`) and one `OGX` instance running in the same namespace, but in production, like the ingress gateway, OGX would run in it's own namespace and route traffic to different runing models, based on payload data `model` specification.
 
@@ -490,10 +497,11 @@ Example architexture:
                  └──────────┘ └──────────┘ └──────────┘
 ```
 
+
 TODO: 
 
-- OGX (formerly Llama Stack)
 - RAG integration
+- tool calling agent
 - llm-d
 - multi model
 - Auth tokens
