@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ogx
+  namespace: rhaiis-demo
+  labels:
+    app: ogx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ogx
+  template:
+    metadata:
+      labels:
+        app: ogx
+    spec:
+      containers:
+        - name: ogx
+          image: docker.io/ogxai/distribution-starter:1.3.1
+          ports:
+            - containerPort: 8321
+          env:
+            # Internal Service, plain HTTP — no TLS between OGX and vLLM inside the namespace
+            - name: VLLM_URL
+              value: "http://rhaiis-granite:8000/v1"
+            - name: VLLM_MAX_TOKENS
+              value: "1024"
+            - name: VLLM_API_TOKEN
+              value: "fake"   # vLLM server has no auth configured; provider default
+            - name: INFERENCE_MODEL
+              value: "ibm-granite/granite-4.2-8b-fp8"   # match whatever's currently deployed
+          readinessProbe:
+            tcpSocket:
+              port: 8321
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          startupProbe:
+            tcpSocket:
+              port: 8321
+            failureThreshold: 30
+            periodSeconds: 5
+          volumeMounts:
+            - name: ogx-data
+              mountPath: /home/lls/.lls
+      volumes:
+        - name: ogx-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ogx-svc
+  namespace: rhaiis-demo
+spec:
+  selector:
+    app: ogx
+  ports:
+    - port: 8321
+      targetPort: 8321

@@ -1,0 +1,24 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ogx
+  namespace: rhaiis-demo
+spec:
+  parentRefs:
+    - name: maas-gateway
+      namespace: maas-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/chat/completions
+      backendRefs:
+        - name: ogx-svc
+          port: 8321
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/models
+      backendRefs:
+        - name: ogx-svc
+          port: 8321

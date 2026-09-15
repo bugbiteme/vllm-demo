@@ -423,6 +423,73 @@ Together, these took mean TTFT at 30 concurrent requests from **2463ms → 192ms
 
 **Caveat:** FP8 weight quantization is a real reduction in numerical precision, unlike KV cache quantization which is effectively lossless for output quality. Worth spot-checking outputs (especially tool-calling / reasoning prompts) before treating this as production-ready — not yet formally validated here.
 
+## OGX (formerly Llama stack)
+
+### Why OGX?
+
+Your vLLM deployment already serves an OpenAI-compatible API — OGX sits in front of it as an orchestration layer, not a replacement. Three concrete reasons to add it:
+
+- **Model-agnostic client compatibility.** OGX exposes model aliases that decouple what a client asks for from what's actually serving it — in this demo, requests for `claude-haiku-4-5-20251001` transparently route to Granite underneath. Client code doesn't need to know or care which model/provider is actually behind the API.
+
+- **Tool-calling and agent orchestration, without hand-building the loop.** Granite 4.2 supports tool-calling natively, but using that capability directly means implementing the multi-step tool-call loop yourself. OGX moves that orchestration server-side.
+
+- **A path to RAG.** Built-in vector store and file-search providers (`faiss`, `sqlite-vec`) mean adding retrieval-augmented generation is a config change, not a new subsystem to build.
+
+It's an extra moving part for a "just serve a model" demo, but the right layer once you want to build an actual application — agent or RAG — on top of the inference server rather than just benchmark it.
+
+```bash
+# deploy OGX
+kubectl apply -f k8s/ogx/deployment-base.yaml -n rhaiis-demo
+
+# add it to our gateway
+kubectl apply -f k8s/ogx/http-route.yaml -n rhaiis-demo 
+
+# test access to it
+GATEWAY=$(kubectl get gateway maas-gateway -n maas-gateway -o jsonpath='{.status.addresses[0].value}')\
+
+echo https://$GATEWAY/v1/chat/completions
+
+curl -k https://$GATEWAY/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "vllm/ibm-granite/granite-4.2-8b-fp8", "messages": [{"role": "user", "content": "Hello"}]}' | jq
+```
+
+Note: we removed the routing header, and are now only relying on the specified model in the payload data. 
+we also added the `vllm/` prefix to the model specification, which is how OGX is routing to our running model.
+
+For this demo we have one model server (`vllm`) and one `OGX` instance running in the same namespace, but in production, like the ingress gateway, OGX would run in it's own namespace and route traffic to different runing models, based on payload data `model` specification.
+
+Example architexture:
+
+```
+                    ┌─────────────────────────────────┐
+                    │  Shared Gateway (Istio-backed)   │
+                    │  GatewayClass: openshift-ai-     │
+                    │  inference/istio                 │
+                    └────────────────┬──────────────────┘
+                                     │
+                    ┌────────────────▼──────────────────┐
+                    │  ai-gateway-operator layer:        │
+                    │  rate limiting, API keys,          │
+                    │  subscription tiers, auth          │
+                    │  (this is the piece replacing      │
+                    │   our "no auth for now")           │
+                    └────────────────┬──────────────────┘
+                                     │
+                    ┌────────────────▼──────────────────┐
+                    │  OGX (own namespace) — model-      │
+                    │  agnostic routing/orchestration,   │
+                    │  same role it plays in this demo,  │
+                    │  just N backends instead of 1      │
+                    └───┬──────────┬──────────┬──────────┘
+                        │          │          │
+                 ┌──────▼───┐ ┌───▼──────┐ ┌─▼────────┐
+                 │ granite- │ │ llama-3  │ │ (model N)│
+                 │ ns       │ │ ns       │ │ ns       │
+                 │ (RHAIIS) │ │ (RHAIIS) │ │ ...      │
+                 └──────────┘ └──────────┘ └──────────┘
+```
+
 TODO: 
 
 - OGX (formerly Llama Stack)
