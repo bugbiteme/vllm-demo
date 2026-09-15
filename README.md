@@ -496,13 +496,34 @@ Example architexture:
                  │ (RHAIIS) │ │ (RHAIIS) │ │ ...      │
                  └──────────┘ └──────────┘ └──────────┘
 ```
+## Web UI
 
+Testing our OGX + vLLM via `curl` commands isn't that exciting. Let's wire it up with `open-webui`, a web based chat interface.
+
+```bash
+oc apply -f k8s/open-webui/deployment.yaml -n rhaiis-demo
+```
+
+Output:
+```bash
+deployment.apps/open-webui created
+service/open-webui created
+```
+
+And test by running this in a separate terminal
+```bash
+kubectl port-forward svc/open-webui 8080:8080 -n rhaiis-demo
+```
+
+then open `http://localhost:8080` — first launch prompts you to create an admin account, then your Granite model (via its OGX alias) should show up as selectable.
+
+Now you can chat with the hosted model, rather than running a series of `curl` commands
 
 TODO: 
 
 - RAG integration
 - tool calling agent
-- llm-d
 - multi model
 - Auth tokens
 - Token quotas
+- llm-d
